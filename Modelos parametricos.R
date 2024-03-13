@@ -380,4 +380,86 @@ grid.text(regresion[1], x = 0.66, y = 0.18, just = "right", gp = gpar(col = "cor
 
 #Confidance intervals------
 
+x <- c(0:max(imotor$time)); l <- length(x)
+fit <- survreg(data = imotor[imotor$temp!=150,],
+               Surv(time,status)~factor(temp))
 
+coef <- c(fit$coefficients,log(fit$scale))
+stde <- sqrt(c(diag(vcov(fit))[1:4]))
+cil <-  coef-stde*1.96
+ciu <-  coef+stde*1.96
+ci <- data.frame("coef" = coef,cil,ciu)
+rownames(ci) <- list("mu (intercept)", "theta Z=1", "theta Z=2", "log(Beta)")
+thetaCI <- rbind("theta Z=0" = c(0,-stde[4]*1.96,stde[4]*1.96),cbind(-ci[2:3,]))
+AFCI <- cbind(exp(thetaCI))
+muCI <- unlist(ci[1,])
+sigmaCI <- unlist(exp(ci[4,]))
+betaCI <- unlist(1/exp(ci[4,]))
+alfaCI<-matrix(ncol=3,nrow=3)
+for(i in 1:3){
+  for(j in 1:3){
+alfaCI[i,j] <- exp(-1*(muCI[j]-thetaCI[i,j])/sigmaCI[j])
+  }
+}
+
+#GRAFICO CURVAS DE CONFIANZA 95%
+windows(width = 7.5, height = 5)
+par(las = 1, oma = c(0,0.5,0,0), mar = c(4.5,4,2,2))
+y <- matrix(ncol=6,nrow=l)#para almacenar los IC
+
+for(i in 1:3){
+  for(j in 1:3){
+    if(j == 1){
+  if(i == 1){
+    k=0
+plot(exp(-alfaCI[i,j]*(x*AFCI[i,j])**(betaCI[j])), type =c("l"),
+     col = "black", xlim = c(0,8064), ylim = c(0,1),xlab = "tiempo", ylab = "S(t)")
+legend("topright", paste(levels(factor(imotor$temp))[2:4],"ºC"),bg = "white",
+       col = 1:4, lwd = 3, inset = 0.02, seg.len = 3)
+  }else{
+    lines(exp(-alfaCI[i,j]*(x*AFCI[i,j])**(betaCI[j])),col = i)
+  }
+    }else{
+      y[,(i-1)*2+j-1] <- exp(-alfaCI[i,j]*(x*AFCI[i,j])**(betaCI[j]))
+    }
+    if(j == 3){
+      k=k+1
+      polygon(c(x, rev(x)), c(y[,(i-1)*2+j-1], rev(y[,(i-1)*2+j-2])),
+              col = rgb(red = k*(i-1)*(i-3)/-2, green = k*(i-1)*(i-2)/6,
+                        blue = k*(2-i)*(3-i)/2, alpha = 0.4), border = NA)
+    }
+  }
+}
+
+
+#IC PARA CURVAS DE RIESGO
+
+for(i in 1:3){
+  for(j in 1:3){
+    if(j == 1){
+      if(i == 1){
+        k=0
+        plot(AFCI[i,j]*alfaCI[i,j]*betaCI[j]*(x*AFCI[i,j])**(betaCI[j]-1)
+          , type =c("l"), col = "black", xlim = c(0,8064), ylim = c(0,0.015),
+          xlab = "tiempo", ylab = "h(t)")
+
+      }else{
+        lines(AFCI[i,j]*alfaCI[i,j]*betaCI[j]*(x*AFCI[i,j])**(betaCI[j]-1),
+              col = i)
+      }
+    }else{
+      y[,(i-1)*2+j-1] <- AFCI[i,j]*alfaCI[i,j]*betaCI[j]*(x*AFCI[i,j])**(betaCI[j]-1)
+    }
+    if(j == 3){
+      k=k+1
+      polygon(c(x, rev(x)), c(y[,(i-1)*2+j-1], rev(y[,(i-1)*2+j-2])),
+              col = rgb(red = k*(i-1)*(i-3)/-2, green = k*(i-1)*(i-2)/6,
+                        blue = k*(2-i)*(3-i)/2, alpha = 0.5), border = NA)
+      if(i==3){
+        
+        legend("topright", paste(levels(factor(imotor$temp))[2:4],"ºC"),bg = "white",
+               col = 1:4, lwd = 3, inset = 0.02, seg.len = 3)
+      }
+    }
+  }
+}
